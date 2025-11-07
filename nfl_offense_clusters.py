@@ -17,15 +17,15 @@ from scipy.spatial import ConvexHull
 import nfl_data_py as nfl
 
 # --------- CONFIG ---------
-YEARS = [2024]                 # e.g., [2022, 2023] if you want multiple seasons
-K_RANGE = range(2, 9)          # elbow candidates
-K_FINAL = 4                    # set after eyeballing the elbow
+YEARS = [2024]                 
+K_RANGE = range(2, 9)          
+K_FINAL = 4                    
 RANDOM_STATE = 0
-LOGOS_DIR = "logos"            # folder with PNGs named like KC.png, PHI.png, DAL.png, ...
-TARGET_LOGO_HEIGHT_PX = 16     # 40–64 are typical; all logos will be this height
+LOGOS_DIR = "logos"            
+TARGET_LOGO_HEIGHT_PX = 16     
 TRIM_TRANSPARENT_BORDERS = True
-HULL_ALPHA = 0.15              # transparency of the cluster hull fill
-HULL_EDGE_ALPHA = 0.7          # edge visibility for the hull outline
+HULL_ALPHA = 0.15              
+HULL_EDGE_ALPHA = 0.7          
 # --------------------------
 
 def load_pbp(years):
@@ -97,7 +97,7 @@ def summarize_clusters(df, id_cols, feature_cols):
         examples = g.sort_values("plays", ascending=False).head(2)[id_cols]
         print(f"  Cluster {clus}:\n{examples.to_string(index=False)}")
 
-# --- Uniform logo helper: trim + resize each logo to a fixed height ---
+
 def _add_logo(ax, xy, logo_path):
     try:
         img = Image.open(logo_path).convert("RGBA")
@@ -111,7 +111,7 @@ def _add_logo(ax, xy, logo_path):
             new_w = int(round(w * (TARGET_LOGO_HEIGHT_PX / h)))
             img = img.resize((new_w, TARGET_LOGO_HEIGHT_PX), Image.LANCZOS)
         arr = np.asarray(img)
-        oi = OffsetImage(arr, zoom=1.0)  # already normalized size
+        oi = OffsetImage(arr, zoom=1.0) 
         ab = AnnotationBbox(oi, xy, frameon=False, zorder=3)
         ax.add_artist(ab)
         return True
@@ -121,7 +121,6 @@ def _add_logo(ax, xy, logo_path):
 def _draw_cluster_hull(ax, x_vals, y_vals, color):
     """Draw a translucent convex hull around the (x,y) points."""
     pts = np.column_stack([x_vals, y_vals])
-    # Need at least 3 points and non-collinear
     if pts.shape[0] < 3:
         return
     try:
@@ -130,16 +129,13 @@ def _draw_cluster_hull(ax, x_vals, y_vals, color):
         ax.fill(hull_pts[:, 0], hull_pts[:, 1],
                 facecolor=color, alpha=HULL_ALPHA, edgecolor=color,
                 linewidth=1.5, zorder=0)
-        # optional: slightly darker outline
         ax.plot(np.append(hull_pts[:, 0], hull_pts[0, 0]),
                 np.append(hull_pts[:, 1], hull_pts[0, 1]),
                 color=color, alpha=HULL_EDGE_ALPHA, linewidth=1.5, zorder=1)
     except Exception:
-        # Degenerate cases (all points same line etc.) — skip hull
         pass
 
 def scatter_2d_with_logos(df, X, feature_cols, save_path="offense_clusters_scatter.png", logos_dir=LOGOS_DIR):
-    # Prefer interpretable axes; fallback to PCA only if needed
     candidates = [("off_epa_pp", "pass_rate"), ("yards_per_play", "off_success_rate")]
     for a, b in candidates:
         if a in feature_cols and b in feature_cols:
@@ -161,35 +157,29 @@ def scatter_2d_with_logos(df, X, feature_cols, save_path="offense_clusters_scatt
     fig, ax = plt.subplots(figsize=(7, 6))
     ax.grid(True, linestyle="--", alpha=0.4)
 
-# Add quadrant axis lines
-
     ax.set_xlabel("PC1" if pca_mode else x_col)
     ax.set_ylabel("PC2" if pca_mode else y_col)
     ax.set_title("NFL Offense Clusters (Logos + Hulls)")
 
-    # consistent colors for clusters
     cmap = plt.get_cmap("tab10")
     cluster_ids = sorted(df["cluster"].unique())
     color_map = {cl: cmap(i % 10) for i, cl in enumerate(cluster_ids)}
 
-    # 1) draw translucent hulls per cluster (behind everything)
     for cl in cluster_ids:
         m = (df["cluster"].values == cl)
         _draw_cluster_hull(ax, x[m], y[m], color_map[cl])
-
-    # 2) faint backdrop points per cluster
+        
     for cl in cluster_ids:
         m = (df["cluster"].values == cl)
         ax.scatter(x[m], y[m], color=color_map[cl], alpha=0.18, s=60, zorder=2, label=f"Cluster {cl}")
 
-    # 3) overlay team logos
+    #overlay team logos
     for _, row in df.iterrows():
         team = row.get("team", None)
         xv, yv = row[x_col], row[y_col]
         logo_file = os.path.join(logos_dir, f"{team}.png") if team else None
         ok = bool(team) and os.path.isfile(logo_file) and _add_logo(ax, (xv, yv), logo_file)
         if not ok:
-            # visible fallback dot with cluster color
             ax.scatter([xv], [yv], s=80, edgecolor="k", linewidth=0.5, alpha=0.9,
                        color=color_map[row["cluster"]], zorder=3)
 
